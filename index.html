@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f8f3ec">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="蛋糕定價">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px}[hidden]{display:none!important}img{max-width:100%}</style>
+<title>藏蛋糕定價計算</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* Layout: two columns — editable cost sheet on the left, sticky price receipt on the right; stacks on phones with the receipt first. */
+:root{
+  --bg:#f8f3ec; --paper:#fffdf9; --ink:#4a3a30; --muted:#8c7a6b; --line:#e6dbcd;
+  --accent:#a8866a; --accent-soft:#efe4d6; --good:#5d8a62; --warn:#b5743a; --bad:#b04a4a;
+  --display:"Noto Serif TC", "Songti TC", serif; --body:"Noto Sans TC", "PingFang TC", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#1f1a16; --paper:#2a231e; --ink:#efe5d9; --muted:#b3a291; --line:#43382f;
+  --accent:#d2b293; --accent-soft:#3a2f27; --good:#8fbf93; --warn:#e0a46b; --bad:#e58d8d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#1f1a16; --paper:#2a231e; --ink:#efe5d9; --muted:#b3a291; --line:#43382f;
+  --accent:#d2b293; --accent-soft:#3a2f27; --good:#8fbf93; --warn:#e0a46b; --bad:#e58d8d; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.6}
+.wrap{max-width:1180px;margin:0 auto;padding-block:28px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{display:flex;flex-direction:column;gap:4px;margin-bottom:22px}
+.eyebrow{font-size:12px;letter-spacing:.18em;color:var(--accent);text-transform:uppercase}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(26px,4vw,36px);margin:0;text-wrap:balance}
+header p{margin:0;color:var(--muted);max-width:62ch}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:22px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}.receipt{order:-1;position:static!important}}
+section{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.col{display:flex;flex-direction:column;gap:18px;min-width:0}
+h2{font-family:var(--display);font-size:19px;margin:0;display:flex;align-items:baseline;gap:10px}
+h2 small{font-family:var(--body);font-size:12px;color:var(--muted);font-weight:400}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.tablebox{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:640px;font-variant-numeric:tabular-nums}
+th{font-size:12px;color:var(--muted);font-weight:500;text-align:left;padding:6px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:4px 6px;border-bottom:1px dashed var(--line)}
+td.num,th.num{text-align:right}
+*,*::before,*::after{box-sizing:border-box}
+input,select{font:inherit;color:var(--ink);background:transparent;border:1px solid transparent;border-radius:8px;padding:5px 7px;width:100%}
+input:hover,select:hover{border-color:var(--line)}
+input:focus,select:focus{outline:none;border-color:var(--accent);background:var(--bg)}
+input[type=number]{text-align:right}
+.del{background:none;border:0;color:var(--muted);cursor:pointer;font-size:16px;padding:4px 8px;border-radius:6px}
+.del:hover,.del:focus-visible{color:var(--bad);background:var(--accent-soft)}
+.btn{font:inherit;font-size:14px;border:1px solid var(--accent);color:var(--accent);background:transparent;border-radius:999px;padding:6px 14px;cursor:pointer;align-self:flex-start}
+.btn:hover,.btn:focus-visible{background:var(--accent);color:var(--paper)}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:13px;color:var(--muted)}
+.field input,.field select{border-color:var(--line);background:var(--bg)}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:5px 14px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--paper)}
+.tag{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.receipt{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px);background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:14px}
+.receipt h2{justify-content:space-between}
+.rows{display:flex;flex-direction:column;gap:6px;font-variant-numeric:tabular-nums}
+.row{display:flex;justify-content:space-between;gap:10px;font-size:14px}
+.row span:first-child{color:var(--muted)}
+.row.sum{border-top:1px solid var(--line);padding-top:8px;font-weight:700;color:var(--ink)}
+.row.sum span:first-child{color:var(--ink)}
+.final{background:var(--accent-soft);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:2px}
+.final .lbl{font-size:13px;color:var(--muted)}
+.final .big{font-family:var(--display);font-size:38px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.final .sub{font-size:13px;color:var(--muted)}
+.check{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+.pill{display:inline-block;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px}
+.pill.good{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+.pill.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.pill.bad{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad)}
+.formula{font-size:12px;color:var(--muted);background:var(--bg);border-radius:8px;padding:8px 10px}
+.note{font-size:12px;color:var(--muted)}
+@media (max-width:760px){
+  .tablebox{overflow:visible}
+  table{min-width:0}
+  thead{display:none}
+  table,tbody{display:block;width:100%}
+  td{width:auto}
+  tr{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px 8px;padding:10px;margin-bottom:10px;border:1px solid var(--line);border-radius:12px;background:var(--bg);position:relative}
+  td{border:0;padding:0;display:flex;flex-direction:column;gap:2px;min-width:0}
+  td::before{content:attr(data-l);font-size:11px;color:var(--muted)}
+  td.num{text-align:left}
+  input[type=number]{text-align:left}
+  td input,td select{border-color:var(--line);background:var(--paper)}
+  td.wide{grid-column:span 2}
+  td.out{font-weight:500;font-size:16px}
+  td.out::after{content:""}
+  td.out{line-height:1.2;padding-top:0}
+  td.sub{grid-column:span 2}
+  tr{padding-right:34px}
+  td.x{position:absolute;top:4px;right:4px;width:auto}
+  td.x::before{content:none}
+}
+@media (prefers-reduced-motion:no-preference){.final .big{transition:color .2s}.pad{transition:transform .2s}}
+.pad{position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--paper);border-top:1px solid var(--line);box-shadow:0 -8px 24px rgba(74,58,48,.12);padding:10px max(12px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));transform:translateY(110%)}
+.pad.open{transform:none}
+.pad-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;max-width:520px;margin:0 auto 8px}
+.pad-lbl{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pad-val{font-family:var(--display);font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+.keys{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-width:520px;margin:0 auto}
+.keys button{font:inherit;font-size:22px;font-variant-numeric:tabular-nums;min-height:52px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:12px;cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+.keys button:active{background:var(--accent-soft)}
+.keys .fn{font-size:15px;color:var(--accent)}
+.keys .ok{background:var(--accent);border-color:var(--accent);color:var(--paper);font-size:16px}
+input.padding-on{border-color:var(--accent)!important;background:var(--accent-soft)!important}
+body.pad-open{padding-bottom:300px}
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">zz 藏蛋糕 · 售價計算</span>
+    <h1>一顆蛋糕該賣多少</h1>
+    <p>照「食材＋包材 → 加耗損 → 用目標毛利率反推 → 加上手工時數」的順序算出建議售價。表格裡的數字是<b>範例</b>，換成你自己的進貨價和用量就好，會自動存在這台裝置上。</p>
+  </header>
+
+  <div class="grid">
+    <div class="col">
+      <section>
+        <h2>① 這顆蛋糕的用料 <small>以 6 寸為基準填用量</small></h2>
+        <p class="hint">包裝量填一包有幾克（或幾個）、進價填那一包多少錢，系統會換成每克單價再乘上這顆的用量。</p>
+        <div class="tablebox">
+          <table>
+            <thead><tr><th style="width:84px">類別</th><th>品項</th><th class="num">包裝量</th><th class="num">進價 $</th><th class="num">單價/單位</th><th class="num">本顆用量</th><th class="num">小計 $</th><th></th></tr></thead>
+            <tbody id="items"></tbody>
+          </table>
+        </div>
+        <div class="seg">
+          <button class="btn" id="addFood" type="button">＋ 加食材</button>
+          <button class="btn" id="addPack" type="button">＋ 加包材</button>
+          <button class="btn" id="reset" type="button">恢復範例</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>② 尺寸與耗損</h2>
+        <div class="field"><label>尺寸（食材用量依面積換算，包材不變）</label>
+          <div class="seg" id="sizes"></div>
+        </div>
+        <div class="fields">
+          <div class="field"><label for="loss">耗損 %（建議 5–10）</label><input id="loss" type="number" min="0" max="30" step="1"></div>
+          <div class="field"><label for="margin">目標毛利率 %（客製建議 75–80）</label><input id="margin" type="number" min="50" max="90" step="1"></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>③ 造型加價 <small>復古擠花、繪圖、立體造型</small></h2>
+        <p class="hint">基礎價只涵蓋材料和工作室營運。花時間的造型，用時薪 × 額外工時另外加。</p>
+        <div class="fields">
+          <div class="field"><label for="wage">你的時薪 $</label><input id="wage" type="number" min="0" step="10"></div>
+          <div class="field"><label for="hours">這款額外工時（小時）</label><input id="hours" type="number" min="0" step="0.25"></div>
+          <div class="field"><label for="round">售價進位到</label><select id="round"><option value="10">十位（$10）</option><option value="50">$50</option><option value="100">百位（$100）</option></select></div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="receipt" aria-live="polite">
+      <h2>建議售價 <span class="tag" id="sizeTag">6 寸</span></h2>
+      <div class="rows">
+        <div class="row"><span>食材</span><span id="rFood">—</span></div>
+        <div class="row"><span>包材</span><span id="rPack">—</span></div>
+        <div class="row"><span>耗損</span><span id="rLoss">—</span></div>
+        <div class="row sum"><span>直接成本</span><span id="rCost">—</span></div>
+        <div class="row"><span id="rBaseLbl">基礎售價</span><span id="rBase">—</span></div>
+        <div class="row"><span>造型加價</span><span id="rExtra">—</span></div>
+      </div>
+      <div class="final">
+        <span class="lbl">建議售價</span>
+        <span class="big" id="rFinal">—</span>
+        <span class="sub" id="rRange">—</span>
+      </div>
+      <div class="formula" id="rFormula"></div>
+      <div class="check">
+        <div class="field"><label for="current">對照你目前的售價 $</label><input id="current" type="number" min="0" step="10"></div>
+        <div id="rCheck" class="note"></div>
+      </div>
+      <p class="note">記得定期更新進貨價；售價也要對照市場上類似款式的行情再微調。</p>
+    </aside>
+  </div>
+</div>
+
+<div class="pad" id="pad" role="dialog" aria-label="數字鍵盤" aria-hidden="true">
+  <div class="pad-head"><span class="pad-lbl" id="padLbl"></span><span class="pad-val" id="padVal">0</span></div>
+  <div class="keys">
+    <button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button><button type="button" class="fn" data-k="back" aria-label="刪除一碼">⌫</button>
+    <button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button><button type="button" class="fn" data-k="clear">清除</button>
+    <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button><button type="button" class="fn" data-k="next">下一格</button>
+    <button type="button" data-k="0">0</button><button type="button" data-k="00">00</button><button type="button" data-k=".">.</button><button type="button" class="ok" data-k="done">完成</button>
+  </div>
+</div>
+
+<script>
+const SIZES=[{k:"4",name:"4 寸",f:0.45},{k:"6",name:"6 寸",f:1},{k:"8",name:"8 寸",f:1.8}];
+const DEFAULT={
+  size:"6",loss:8,margin:75,wage:400,hours:0,round:"10",current:1200,
+  items:[
+    {c:"食材",n:"低筋麵粉",pk:1000,p:85,u:60},
+    {c:"食材",n:"雞蛋",pk:1000,p:110,u:200},
+    {c:"食材",n:"細砂糖",pk:1000,p:45,u:90},
+    {c:"食材",n:"植物油",pk:1000,p:325,u:25},
+    {c:"食材",n:"牛奶",pk:936,p:95,u:50},
+    {c:"食材",n:"動物性鮮奶油",pk:1000,p:280,u:450},
+    {c:"食材",n:"內餡（當季水果）",pk:1000,p:300,u:150},
+    {c:"食材",n:"裝飾糖珠",pk:100,p:60,u:5},
+    {c:"包材",n:"蛋糕盒＋底盤",pk:1,p:38,u:1},
+    {c:"包材",n:"緞帶",pk:1,p:5,u:1},
+    {c:"包材",n:"蠟燭",pk:1,p:3,u:1},
+    {c:"包材",n:"品牌貼紙",pk:1,p:2,u:1},
+    {c:"包材",n:"保冷劑",pk:1,p:4,u:1}
+  ]};
+let S;
+try{S=JSON.parse(localStorage.getItem("zzcake-price"))}catch(e){}
+if(!S||!Array.isArray(S.items))S=structuredClone(DEFAULT);
+const $=id=>document.getElementById(id);
+const money=v=>"$"+Math.round(v).toLocaleString("en-US");
+const money1=v=>"$"+(Math.round(v*10)/10).toLocaleString("en-US");
+function save(){try{localStorage.setItem("zzcake-price",JSON.stringify(S))}catch(e){}}
+
+var renderItems=function(){
+  const tb=$("items"); tb.innerHTML="";
+  S.items.forEach((it,i)=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td data-l="類別"><select id="c${i}" aria-label="類別"><option${it.c==="食材"?" selected":""}>食材</option><option${it.c==="包材"?" selected":""}>包材</option></select></td>
+      <td class="wide" data-l="品項"><input id="n${i}" aria-label="品項" value="${it.n.replace(/"/g,"&quot;")}"></td>
+      <td class="num" data-l="包裝量"><input id="pk${i}" type="number" min="0" step="any" aria-label="包裝量" value="${it.pk}"></td>
+      <td class="num" data-l="進價 $"><input id="p${i}" type="number" min="0" step="any" aria-label="進價" value="${it.p}"></td>
+      <td class="num out" data-l="單價" id="unit${i}"></td>
+      <td class="num" data-l="本顆用量"><input id="u${i}" type="number" min="0" step="any" aria-label="本顆用量" value="${it.u}"></td>
+      <td class="num out sub" data-l="小計" id="sub${i}"></td>
+      <td class="x"><button class="del" type="button" aria-label="刪除 ${it.n}" data-i="${i}">×</button></td>`;
+    tb.appendChild(tr);
+    tr.querySelectorAll("input,select").forEach(el=>el.addEventListener("input",()=>{
+      it.c=$("c"+i).value; it.n=$("n"+i).value; it.pk=+$("pk"+i).value||0; it.p=+$("p"+i).value||0; it.u=+$("u"+i).value||0; calc();
+    }));
+  });
+  tb.querySelectorAll(".del").forEach(b=>b.addEventListener("click",()=>{S.items.splice(+b.dataset.i,1);renderItems();calc();}));
+};
+function renderSizes(){
+  const box=$("sizes"); box.innerHTML="";
+  SIZES.forEach(z=>{const b=document.createElement("button");b.type="button";b.textContent=z.name;b.setAttribute("aria-pressed",S.size===z.k);
+    b.onclick=()=>{S.size=z.k;renderSizes();calc();};box.appendChild(b);});
+}
+function bindFields(){
+  ["loss","margin","wage","hours","current"].forEach(k=>{$(k).value=S[k];$(k).addEventListener("input",()=>{S[k]=+$(k).value||0;calc();});});
+  $("round").value=S.round; $("round").addEventListener("change",()=>{S.round=$("round").value;calc();});
+}
+function roundUp(v,step){return Math.ceil(v/step)*step}
+function calc(){
+  const z=SIZES.find(s=>s.k===S.size)||SIZES[1];
+  let food=0,pack=0;
+  S.items.forEach((it,i)=>{
+    const unit=it.pk>0?it.p/it.pk:0;
+    const use=it.c==="食材"?it.u*z.f:it.u;
+    const sub=unit*use;
+    if(it.c==="食材")food+=sub;else pack+=sub;
+    if($("unit"+i))$("unit"+i).textContent=unit?(unit<1?unit.toFixed(3):unit.toFixed(1)):"—";
+    if($("sub"+i))$("sub"+i).textContent=money1(sub);
+  });
+  const lossAmt=(food+pack)*S.loss/100;
+  const cost=food+pack+lossAmt;
+  const m=Math.min(Math.max(S.margin,0),95)/100;
+  const base=cost/(1-m);
+  const extra=S.wage*S.hours;
+  const step=+S.round;
+  const final=roundUp(base+extra,step);
+  const p75=roundUp(cost/0.25+extra,step), p80=roundUp(cost/0.20+extra,step);
+  $("sizeTag").textContent=z.name;
+  $("rFood").textContent=money1(food); $("rPack").textContent=money1(pack);
+  $("rLoss").textContent=money1(lossAmt)+`（${S.loss}%）`;
+  $("rCost").textContent=money(cost);
+  $("rBaseLbl").textContent=`基礎售價（毛利 ${S.margin}%）`;
+  $("rBase").textContent=money(base);
+  $("rExtra").textContent=extra?`${money(S.wage)} × ${S.hours} 小時 = ${money(extra)}`:"$0";
+  $("rFinal").textContent=money(final);
+  $("rRange").textContent=`毛利 75%：${money(p75)}　毛利 80%：${money(p80)}`;
+  $("rFormula").textContent=`直接成本 ${money(cost)} ÷（1 − ${S.margin}%）＋ 造型加價 ${money(extra)}，再進位到 $${step}`;
+  const cur=S.current;
+  if(cur>0){
+    const gm=(cur-extra-cost)/(cur-extra||1);
+    const pct=Math.round(gm*100);
+    let cls="good",msg="價格健康";
+    if(gm<0.6){cls="bad";msg="毛利偏低，建議調高"}else if(gm<0.75){cls="warn";msg="低於建議的 75%"}
+    $("rCheck").innerHTML=`目前 ${money(cur)} 的材料毛利率約 <span class="pill ${cls}">${pct}%</span> ${msg}${extra?"（已先扣掉造型加價）":""}`;
+  }else $("rCheck").textContent="輸入目前售價，就能看到實際毛利率。";
+  save();
+}
+$("addFood").onclick=()=>{S.items.push({c:"食材",n:"新食材",pk:1000,p:0,u:0});renderItems();calc();};
+$("addPack").onclick=()=>{S.items.push({c:"包材",n:"新包材",pk:1,p:0,u:1});renderItems();calc();};
+$("reset").onclick=()=>{S=structuredClone(DEFAULT);renderItems();renderSizes();bindFields();calc();};
+renderItems();renderSizes();bindFields();calc();
+
+/* 內建數字鍵盤：觸控裝置點數字格時不跳手機鍵盤，改用頁面下方的鍵盤 */
+const touch=matchMedia("(pointer:coarse)").matches;
+const pad=$("pad");let cur=null,fresh=true;
+const nums=()=>[...document.querySelectorAll('input[type="number"]')];
+function labelOf(el){
+  const l=document.querySelector(`label[for="${el.id}"]`); if(l)return l.textContent;
+  const tr=el.closest("tr"); const n=tr&&tr.querySelector('input[aria-label="品項"]');
+  return (n?n.value+" · ":"")+el.getAttribute("aria-label");
+}
+function markNums(){if(touch)nums().forEach(el=>{el.setAttribute("inputmode","none");});}
+function openPad(el){
+  if(cur)cur.classList.remove("padding-on");
+  cur=el;fresh=true;el.classList.add("padding-on");
+  $("padLbl").textContent=labelOf(el);$("padVal").textContent=el.value||"0";
+  pad.classList.add("open");pad.setAttribute("aria-hidden","false");document.body.classList.add("pad-open");
+  setTimeout(()=>el.scrollIntoView({block:"center",behavior:"smooth"}),50);
+}
+function closePad(){
+  if(cur){cur.classList.remove("padding-on");cur.blur();}cur=null;
+  pad.classList.remove("open");pad.setAttribute("aria-hidden","true");document.body.classList.remove("pad-open");
+}
+function setVal(v){cur.value=v;$("padVal").textContent=v||"0";cur.dispatchEvent(new Event("input",{bubbles:true}));}
+pad.addEventListener("pointerdown",e=>e.preventDefault());
+pad.addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b||!cur)return;const k=b.dataset.k;let v=String(cur.value||"");
+  if(k==="done")return closePad();
+  if(k==="next"){const list=nums();const i=list.indexOf(cur);const nx=list[i+1];if(nx){nx.focus({preventScroll:true});openPad(nx);}else closePad();return;}
+  if(k==="clear"){fresh=false;return setVal("");}
+  if(k==="back"){fresh=false;return setVal(v.slice(0,-1));}
+  if(fresh){v="";fresh=false;}
+  if(k==="."){if(v.includes("."))return;v=(v||"0")+".";}
+  else{v=(v==="0"?"":v)+k;}
+  setVal(v);
+});
+if(touch){
+  document.addEventListener("focusin",e=>{if(e.target.matches('input[type="number"]'))openPad(e.target);});
+  document.addEventListener("pointerdown",e=>{if(cur&&!pad.contains(e.target)&&!e.target.matches('input[type="number"]'))closePad();});
+  const _ri=renderItems;renderItems=function(){_ri();markNums();};
+  markNums();
+}
+</script>
+
+<script>if("serviceWorker" in navigator){addEventListener("load",()=>navigator.serviceWorker.register("sw.js"));}</script>
+</body>
+</html>
